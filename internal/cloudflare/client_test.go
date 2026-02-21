@@ -26,34 +26,34 @@ func TestFetchHTTPMetricsAggregatesByHost(t *testing.T) {
 								{
 									"dimensions": {
 										"clientRequestHTTPHost": "example.com",
-										"edgeResponseStatus": 200
+										"edgeResponseStatus": 200,
+										"cacheStatus": "hit"
 									},
 									"sum": {
 										"visits": 10,
-										"edgeResponseBytes": 1000,
-										"cachedRequests": 5
+										"edgeResponseBytes": 1000
 									}
 								},
 								{
 									"dimensions": {
 										"clientRequestHTTPHost": "example.com",
-										"edgeResponseStatus": 404
+										"edgeResponseStatus": 404,
+										"cacheStatus": "dynamic"
 									},
 									"sum": {
 										"visits": 2,
-										"edgeResponseBytes": 200,
-										"cachedRequests": 0
+										"edgeResponseBytes": 200
 									}
 								},
 								{
 									"dimensions": {
 										"clientRequestHTTPHost": "docs.example.com",
-										"edgeResponseStatus": 301
+										"edgeResponseStatus": 301,
+										"cacheStatus": "revalidated"
 									},
 									"sum": {
 										"visits": 7,
-										"edgeResponseBytes": 700,
-										"cachedRequests": 1
+										"edgeResponseBytes": 700
 									}
 								}
 							]
@@ -90,6 +90,9 @@ func TestFetchHTTPMetricsAggregatesByHost(t *testing.T) {
 	if spendseer.StatusRequests["4xx"] != 2 {
 		t.Fatalf("expected example.com 4xx to be 2, got %.0f", spendseer.StatusRequests["4xx"])
 	}
+	if spendseer.CachedRequests != 10 {
+		t.Fatalf("expected example.com cached requests to be 10, got %.0f", spendseer.CachedRequests)
+	}
 
 	docs := result["docs.example.com"]
 	if docs.Requests != 7 {
@@ -97,6 +100,9 @@ func TestFetchHTTPMetricsAggregatesByHost(t *testing.T) {
 	}
 	if docs.StatusRequests["3xx"] != 7 {
 		t.Fatalf("expected docs.example.com 3xx to be 7, got %.0f", docs.StatusRequests["3xx"])
+	}
+	if docs.CachedRequests != 7 {
+		t.Fatalf("expected docs.example.com cached requests to be 7, got %.0f", docs.CachedRequests)
 	}
 }
 

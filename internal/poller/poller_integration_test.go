@@ -32,16 +32,16 @@ func TestPollerAndMetricsEndpointIntegration(t *testing.T) {
 							{
 								"httpRequestsAdaptiveGroups": [
 									{
-										"dimensions": {"clientRequestHTTPHost": "example.com", "edgeResponseStatus": 200},
-										"sum": {"visits": 15, "edgeResponseBytes": 1500, "cachedRequests": 6}
+										"dimensions": {"clientRequestHTTPHost": "example.com", "edgeResponseStatus": 200, "cacheStatus": "hit"},
+										"sum": {"visits": 15, "edgeResponseBytes": 1500}
 									},
 									{
-										"dimensions": {"clientRequestHTTPHost": "docs.example.com", "edgeResponseStatus": 404},
-										"sum": {"visits": 2, "edgeResponseBytes": 200, "cachedRequests": 0}
+										"dimensions": {"clientRequestHTTPHost": "docs.example.com", "edgeResponseStatus": 404, "cacheStatus": "dynamic"},
+										"sum": {"visits": 2, "edgeResponseBytes": 200}
 									},
 									{
-										"dimensions": {"clientRequestHTTPHost": "templates.example.com", "edgeResponseStatus": 301},
-										"sum": {"visits": 4, "edgeResponseBytes": 400, "cachedRequests": 1}
+										"dimensions": {"clientRequestHTTPHost": "templates.example.com", "edgeResponseStatus": 301, "cacheStatus": "stale"},
+										"sum": {"visits": 4, "edgeResponseBytes": 400}
 									}
 								]
 							}

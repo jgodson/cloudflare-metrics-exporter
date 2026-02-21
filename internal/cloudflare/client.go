@@ -161,7 +161,9 @@ func aggregateHTTPMetrics(hosts []string, response httpGraphQLResponse) map[stri
 
 		hostMetrics.Requests += group.Sum.Requests
 		hostMetrics.EdgeResponseBytes += group.Sum.EdgeResponseBytes
-		hostMetrics.CachedRequests += group.Sum.CachedRequests
+		if isCachedResponse(group.Dimensions.CacheStatus) {
+			hostMetrics.CachedRequests += group.Sum.Requests
+		}
 		if status := statusClass(group.Dimensions.EdgeResponseStatus); status != "" {
 			hostMetrics.StatusRequests[status] += group.Sum.Requests
 		}
@@ -266,6 +268,15 @@ func statusClass(code int) string {
 	}
 }
 
+func isCachedResponse(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "hit", "stale", "revalidated", "updating":
+		return true
+	default:
+		return false
+	}
+}
+
 type httpGraphQLResponse struct {
 	Data struct {
 		Viewer struct {
@@ -274,11 +285,11 @@ type httpGraphQLResponse struct {
 					Dimensions struct {
 						ClientRequestHTTPHost string `json:"clientRequestHTTPHost"`
 						EdgeResponseStatus    int    `json:"edgeResponseStatus"`
+						CacheStatus           string `json:"cacheStatus"`
 					} `json:"dimensions"`
 					Sum struct {
 						Requests          float64 `json:"visits"`
 						EdgeResponseBytes float64 `json:"edgeResponseBytes"`
-						CachedRequests    float64 `json:"cachedRequests"`
 					} `json:"sum"`
 				} `json:"httpRequestsAdaptiveGroups"`
 			} `json:"zones"`

@@ -46,9 +46,9 @@ func TestHTTPMetricsQueryContainsExpectedFields(t *testing.T) {
 		"httpRequestsAdaptiveGroups",
 		"clientRequestHTTPHost",
 		"edgeResponseStatus",
+		"cacheStatus",
 		"visits",
 		"edgeResponseBytes",
-		"cachedRequests",
 	}
 	for _, part := range required {
 		if !strings.Contains(HTTPMetricsQuery, part) {

@@ -17,11 +17,11 @@ query ZoneHTTPMetrics($zoneTag: string!, $hosts: [string!], $from: Time!, $to: T
         dimensions {
           clientRequestHTTPHost
           edgeResponseStatus
+          cacheStatus
         }
         sum {
           visits
           edgeResponseBytes
-          cachedRequests
         }
       }
     }
