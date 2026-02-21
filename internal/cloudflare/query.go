@@ -19,7 +19,7 @@ query ZoneHTTPMetrics($zoneTag: string!, $hosts: [string!], $from: Time!, $to: T
           edgeResponseStatus
         }
         sum {
-          requests
+          visits
           edgeResponseBytes
           cachedRequests
         }

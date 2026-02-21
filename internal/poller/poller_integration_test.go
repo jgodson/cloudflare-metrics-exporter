@@ -33,15 +33,15 @@ func TestPollerAndMetricsEndpointIntegration(t *testing.T) {
 								"httpRequestsAdaptiveGroups": [
 									{
 										"dimensions": {"clientRequestHTTPHost": "example.com", "edgeResponseStatus": 200},
-										"sum": {"requests": 15, "edgeResponseBytes": 1500, "cachedRequests": 6}
+										"sum": {"visits": 15, "edgeResponseBytes": 1500, "cachedRequests": 6}
 									},
 									{
 										"dimensions": {"clientRequestHTTPHost": "docs.example.com", "edgeResponseStatus": 404},
-										"sum": {"requests": 2, "edgeResponseBytes": 200, "cachedRequests": 0}
+										"sum": {"visits": 2, "edgeResponseBytes": 200, "cachedRequests": 0}
 									},
 									{
 										"dimensions": {"clientRequestHTTPHost": "templates.example.com", "edgeResponseStatus": 301},
-										"sum": {"requests": 4, "edgeResponseBytes": 400, "cachedRequests": 1}
+										"sum": {"visits": 4, "edgeResponseBytes": 400, "cachedRequests": 1}
 									}
 								]
 							}

@@ -46,7 +46,7 @@ func TestHTTPMetricsQueryContainsExpectedFields(t *testing.T) {
 		"httpRequestsAdaptiveGroups",
 		"clientRequestHTTPHost",
 		"edgeResponseStatus",
-		"requests",
+		"visits",
 		"edgeResponseBytes",
 		"cachedRequests",
 	}

@@ -29,7 +29,7 @@ func TestFetchHTTPMetricsAggregatesByHost(t *testing.T) {
 										"edgeResponseStatus": 200
 									},
 									"sum": {
-										"requests": 10,
+										"visits": 10,
 										"edgeResponseBytes": 1000,
 										"cachedRequests": 5
 									}
@@ -40,7 +40,7 @@ func TestFetchHTTPMetricsAggregatesByHost(t *testing.T) {
 										"edgeResponseStatus": 404
 									},
 									"sum": {
-										"requests": 2,
+										"visits": 2,
 										"edgeResponseBytes": 200,
 										"cachedRequests": 0
 									}
@@ -51,7 +51,7 @@ func TestFetchHTTPMetricsAggregatesByHost(t *testing.T) {
 										"edgeResponseStatus": 301
 									},
 									"sum": {
-										"requests": 7,
+										"visits": 7,
 										"edgeResponseBytes": 700,
 										"cachedRequests": 1
 									}

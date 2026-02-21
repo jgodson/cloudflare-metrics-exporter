@@ -276,7 +276,7 @@ type httpGraphQLResponse struct {
 						EdgeResponseStatus    int    `json:"edgeResponseStatus"`
 					} `json:"dimensions"`
 					Sum struct {
-						Requests          float64 `json:"requests"`
+						Requests          float64 `json:"visits"`
 						EdgeResponseBytes float64 `json:"edgeResponseBytes"`
 						CachedRequests    float64 `json:"cachedRequests"`
 					} `json:"sum"`
