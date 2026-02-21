@@ -33,6 +33,7 @@ Prometheus exporter that polls Cloudflare GraphQL analytics every minute and pub
 | `CF_ZONE_TAGS` | Yes | - | Comma-separated Cloudflare zone IDs. |
 | `CF_HOSTS` | Yes | - | Comma-separated hosts. |
 | `CF_ACCOUNT_TAG` | No | - | Optional account tag. Required for `cf_gateway_l7_requests_window`. In sharded deployments, set this on only one shard unless account queries are intentionally partitioned to avoid duplicate account-level metrics. |
+| `ENABLED_QUERIES` | No | `http,firewall,gateway_l7` | Comma-separated query list. Allowed: `http`, `firewall`, `gateway_l7` (or alias `gateway`). Disable unsupported datasets (for example free-plan zones can use `http,gateway_l7`). |
 | `POLL_INTERVAL` | No | `60s` | Must be `>= 30s`. |
 | `WINDOW` | No | `1m` | Must be `>= POLL_INTERVAL` and `<= 15m`. |
 | `PORT` | No | `8080` | HTTP listen port (binds `:PORT`). |
@@ -63,6 +64,8 @@ export CF_ZONE_TAGS="zone-tag-1,zone-tag-2"
 export CF_HOSTS="example.com,docs.example.com,templates.example.com"
 # optional, enables gateway L7 metrics
 # export CF_ACCOUNT_TAG="..."
+# optional, skip unsupported datasets such as firewall
+# export ENABLED_QUERIES="http,gateway_l7"
 make run
 ```
 

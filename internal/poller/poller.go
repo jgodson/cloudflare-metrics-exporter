@@ -93,53 +93,68 @@ func (p *Poller) PollOnce(ctx context.Context) error {
 	from := pollTime.Add(-p.cfg.Window)
 
 	allQueriesSucceeded := true
+	httpEnabled := p.queryEnabled(queryHTTP)
+	firewallEnabled := p.queryEnabled(queryFirewall)
+	gatewayEnabled := p.queryEnabled(queryGateway)
 
 	httpByZone := make(map[string]map[string]metrics.HostWindowMetrics, len(p.cfg.ZoneTags))
 	firewallByZone := make(map[string]map[string]map[string]float64, len(p.cfg.ZoneTags))
 
 	for _, zoneTag := range p.cfg.ZoneTags {
-		httpResult, err := p.fetchHTTPWithRetry(ctx, zoneTag, from, pollTime)
-		if err != nil {
-			if errors.Is(err, context.Canceled) {
-				return context.Canceled
-			}
-			allQueriesSucceeded = false
-			p.metrics.SetQueryUp(queryHTTP, zoneTag, false)
-			p.metrics.IncQueryErrors(queryHTTP, zoneTag)
-			p.logger.Warn("http metrics query failed", "zone", zoneTag, "error", err)
-		} else {
-			p.metrics.SetQueryUp(queryHTTP, zoneTag, true)
-			converted := make(map[string]metrics.HostWindowMetrics, len(httpResult))
-			for host, values := range httpResult {
-				converted[host] = metrics.HostWindowMetrics{
-					Requests:          values.Requests,
-					EdgeResponseBytes: values.EdgeResponseBytes,
-					CachedRequests:    values.CachedRequests,
-					StatusByClass:     values.StatusRequests,
+		if httpEnabled {
+			httpResult, err := p.fetchHTTPWithRetry(ctx, zoneTag, from, pollTime)
+			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					return context.Canceled
 				}
+				allQueriesSucceeded = false
+				p.metrics.SetQueryUp(queryHTTP, zoneTag, false)
+				p.metrics.IncQueryErrors(queryHTTP, zoneTag)
+				p.logger.Warn("http metrics query failed", "zone", zoneTag, "error", err)
+			} else {
+				p.metrics.SetQueryUp(queryHTTP, zoneTag, true)
+				converted := make(map[string]metrics.HostWindowMetrics, len(httpResult))
+				for host, values := range httpResult {
+					converted[host] = metrics.HostWindowMetrics{
+						Requests:          values.Requests,
+						EdgeResponseBytes: values.EdgeResponseBytes,
+						CachedRequests:    values.CachedRequests,
+						StatusByClass:     values.StatusRequests,
+					}
+				}
+				httpByZone[zoneTag] = converted
 			}
-			httpByZone[zoneTag] = converted
 		}
 
-		firewallResult, err := p.fetchFirewallWithRetry(ctx, zoneTag, from, pollTime)
-		if err != nil {
-			if errors.Is(err, context.Canceled) {
-				return context.Canceled
+		if firewallEnabled {
+			firewallResult, err := p.fetchFirewallWithRetry(ctx, zoneTag, from, pollTime)
+			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					return context.Canceled
+				}
+				allQueriesSucceeded = false
+				p.metrics.SetQueryUp(queryFirewall, zoneTag, false)
+				p.metrics.IncQueryErrors(queryFirewall, zoneTag)
+				p.logger.Warn("firewall metrics query failed", "zone", zoneTag, "error", err)
+			} else {
+				p.metrics.SetQueryUp(queryFirewall, zoneTag, true)
+				firewallByZone[zoneTag] = firewallResult
 			}
-			allQueriesSucceeded = false
-			p.metrics.SetQueryUp(queryFirewall, zoneTag, false)
-			p.metrics.IncQueryErrors(queryFirewall, zoneTag)
-			p.logger.Warn("firewall metrics query failed", "zone", zoneTag, "error", err)
-		} else {
-			p.metrics.SetQueryUp(queryFirewall, zoneTag, true)
-			firewallByZone[zoneTag] = firewallResult
 		}
 	}
 
-	p.metrics.UpdateZoneWindows(p.cfg.Hosts, httpByZone)
-	p.metrics.UpdateFirewallWindows(p.cfg.Hosts, firewallByZone)
+	if httpEnabled {
+		p.metrics.UpdateZoneWindows(p.cfg.Hosts, httpByZone)
+	} else {
+		p.metrics.UpdateZoneWindows(p.cfg.Hosts, nil)
+	}
+	if firewallEnabled {
+		p.metrics.UpdateFirewallWindows(p.cfg.Hosts, firewallByZone)
+	} else {
+		p.metrics.UpdateFirewallWindows(p.cfg.Hosts, nil)
+	}
 
-	if strings.TrimSpace(p.cfg.AccountTag) != "" {
+	if gatewayEnabled && strings.TrimSpace(p.cfg.AccountTag) != "" {
 		gatewayResult, err := p.fetchGatewayWithRetry(ctx, from, pollTime)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
@@ -269,4 +284,11 @@ func sleepWithContext(ctx context.Context, d time.Duration) bool {
 	case <-t.C:
 		return true
 	}
+}
+
+func (p *Poller) queryEnabled(query string) bool {
+	if len(p.cfg.EnabledQueries) == 0 {
+		return true
+	}
+	return p.cfg.EnabledQueries[query]
 }

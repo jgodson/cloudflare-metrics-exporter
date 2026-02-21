@@ -40,6 +40,8 @@ spec:
               value: "<account-tag-or-empty>"
             - name: CF_HOSTS
               value: "example.com,docs.example.com,templates.example.com"
+            - name: ENABLED_QUERIES
+              value: "http,firewall,gateway_l7"
             - name: POLL_INTERVAL
               value: "60s"
             - name: WINDOW

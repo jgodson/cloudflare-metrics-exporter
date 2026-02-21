@@ -28,6 +28,9 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 	if cfg.LogLevel != DefaultLogLevel {
 		t.Fatalf("expected default log level %s, got %s", DefaultLogLevel, cfg.LogLevel)
 	}
+	if !cfg.EnabledQueries[QueryHTTP] || !cfg.EnabledQueries[QueryFirewall] || !cfg.EnabledQueries[QueryGateway] {
+		t.Fatalf("expected default enabled queries to include http, firewall, gateway_l7")
+	}
 }
 
 func TestLoadFromEnvHostParsing(t *testing.T) {
@@ -120,6 +123,35 @@ func TestLoadFromEnvInvalidPort(t *testing.T) {
 	}
 }
 
+func TestLoadFromEnvEnabledQueries(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("ENABLED_QUERIES", "http,gateway")
+
+	cfg, err := LoadFromEnv()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !cfg.EnabledQueries[QueryHTTP] {
+		t.Fatalf("expected http query to be enabled")
+	}
+	if cfg.EnabledQueries[QueryFirewall] {
+		t.Fatalf("expected firewall query to be disabled")
+	}
+	if !cfg.EnabledQueries[QueryGateway] {
+		t.Fatalf("expected gateway query to be enabled")
+	}
+}
+
+func TestLoadFromEnvInvalidEnabledQueries(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("ENABLED_QUERIES", "http,invalid")
+
+	_, err := LoadFromEnv()
+	if err == nil {
+		t.Fatal("expected error for invalid ENABLED_QUERIES")
+	}
+}
+
 func setRequiredEnv(t *testing.T) {
 	t.Helper()
 	t.Setenv("CF_API_TOKEN", "token")
@@ -130,4 +162,5 @@ func setRequiredEnv(t *testing.T) {
 	t.Setenv("PORT", "")
 	t.Setenv("REQUEST_TIMEOUT", "")
 	t.Setenv("LOG_LEVEL", "")
+	t.Setenv("ENABLED_QUERIES", "")
 }

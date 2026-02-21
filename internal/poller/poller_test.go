@@ -21,9 +21,13 @@ type fakeClient struct {
 	firewallErrByZone    map[string]error
 	gatewayResult        map[string]map[string]float64
 	gatewayErr           error
+	httpCalls            int
+	firewallCalls        int
+	gatewayCalls         int
 }
 
 func (f *fakeClient) FetchHTTPMetrics(ctx context.Context, zoneTag string, hosts []string, from, to time.Time) (map[string]cloudflare.HostMetrics, error) {
+	f.httpCalls++
 	if err, ok := f.httpErrByZone[zoneTag]; ok && err != nil {
 		return nil, err
 	}
@@ -34,6 +38,7 @@ func (f *fakeClient) FetchHTTPMetrics(ctx context.Context, zoneTag string, hosts
 }
 
 func (f *fakeClient) FetchFirewallMetrics(ctx context.Context, zoneTag string, hosts []string, from, to time.Time) (map[string]map[string]float64, error) {
+	f.firewallCalls++
 	if err, ok := f.firewallErrByZone[zoneTag]; ok && err != nil {
 		return nil, err
 	}
@@ -44,6 +49,7 @@ func (f *fakeClient) FetchFirewallMetrics(ctx context.Context, zoneTag string, h
 }
 
 func (f *fakeClient) FetchGatewayL7Metrics(ctx context.Context, accountTag string, hosts []string, from, to time.Time) (map[string]map[string]float64, error) {
+	f.gatewayCalls++
 	if f.gatewayErr != nil {
 		return nil, f.gatewayErr
 	}
@@ -230,5 +236,53 @@ func TestPollOnceSkipsGatewayWhenAccountTagMissing(t *testing.T) {
 
 	if count := testutil.CollectAndCount(registry.GatewayL7RequestsWindow); count != 0 {
 		t.Fatalf("expected no gateway series when account tag missing, got %d", count)
+	}
+}
+
+func TestPollOnceSkipsDisabledQueries(t *testing.T) {
+	cfg := config.Config{
+		ZoneTags:       []string{"zone-123"},
+		AccountTag:     "account-123",
+		Hosts:          []string{"example.com"},
+		Window:         time.Minute,
+		PollInterval:   time.Minute,
+		RequestTimeout: 2 * time.Second,
+		EnabledQueries: map[string]bool{
+			queryHTTP: true,
+		},
+	}
+
+	client := &fakeClient{
+		httpResultByZone: map[string]map[string]cloudflare.HostMetrics{
+			"zone-123": {
+				"example.com": {Requests: 5, StatusRequests: map[string]float64{}},
+			},
+		},
+		firewallErrByZone: map[string]error{
+			"zone-123": errors.New("should not be called"),
+		},
+		gatewayErr: errors.New("should not be called"),
+	}
+
+	registry := metrics.NewRegistry()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	poller := New(cfg, client, registry, logger)
+	poller.maxAttempts = 1
+
+	if err := poller.PollOnce(context.Background()); err != nil {
+		t.Fatalf("expected poll success, got %v", err)
+	}
+
+	if client.httpCalls != 1 {
+		t.Fatalf("expected one http call, got %d", client.httpCalls)
+	}
+	if client.firewallCalls != 0 {
+		t.Fatalf("expected firewall to be skipped, got %d calls", client.firewallCalls)
+	}
+	if client.gatewayCalls != 0 {
+		t.Fatalf("expected gateway to be skipped, got %d calls", client.gatewayCalls)
+	}
+	if count := testutil.CollectAndCount(registry.QueryUp); count != 1 {
+		t.Fatalf("expected only one query_up series (http), got %d", count)
 	}
 }

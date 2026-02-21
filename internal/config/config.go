@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -18,6 +19,10 @@ const (
 	DefaultHTTPAddr       = ":8080"
 	DefaultRequestTimeout = 10 * time.Second
 	DefaultLogLevel       = "info"
+
+	QueryHTTP     = "http"
+	QueryFirewall = "firewall"
+	QueryGateway  = "gateway_l7"
 )
 
 type Config struct {
@@ -30,6 +35,7 @@ type Config struct {
 	HTTPAddr       string
 	RequestTimeout time.Duration
 	LogLevel       string
+	EnabledQueries map[string]bool
 }
 
 func LoadFromEnv() (Config, error) {
@@ -39,6 +45,7 @@ func LoadFromEnv() (Config, error) {
 		HTTPAddr:       DefaultHTTPAddr,
 		RequestTimeout: DefaultRequestTimeout,
 		LogLevel:       DefaultLogLevel,
+		EnabledQueries: defaultEnabledQueries(),
 	}
 
 	var errs []string
@@ -97,6 +104,15 @@ func LoadFromEnv() (Config, error) {
 
 	if value := strings.TrimSpace(os.Getenv("LOG_LEVEL")); value != "" {
 		cfg.LogLevel = strings.ToLower(value)
+	}
+
+	if value := strings.TrimSpace(os.Getenv("ENABLED_QUERIES")); value != "" {
+		queries, err := parseEnabledQueries(value)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("ENABLED_QUERIES is invalid: %v", err))
+		} else {
+			cfg.EnabledQueries = queries
+		}
 	}
 
 	if cfg.PollInterval < MinPollInterval {
@@ -197,4 +213,44 @@ func validatePort(value string) error {
 		return errors.New("port must be between 1 and 65535")
 	}
 	return nil
+}
+
+func defaultEnabledQueries() map[string]bool {
+	return map[string]bool{
+		QueryHTTP:     true,
+		QueryFirewall: true,
+		QueryGateway:  true,
+	}
+}
+
+func parseEnabledQueries(raw string) (map[string]bool, error) {
+	result := make(map[string]bool)
+	var invalid []string
+
+	for _, item := range strings.Split(raw, ",") {
+		query := strings.ToLower(strings.TrimSpace(item))
+		if query == "" {
+			continue
+		}
+		if query == "gateway" {
+			query = QueryGateway
+		}
+
+		switch query {
+		case QueryHTTP, QueryFirewall, QueryGateway:
+			result[query] = true
+		default:
+			invalid = append(invalid, query)
+		}
+	}
+
+	if len(invalid) > 0 {
+		sort.Strings(invalid)
+		return nil, fmt.Errorf("unknown values: %s", strings.Join(invalid, ", "))
+	}
+	if len(result) == 0 {
+		return nil, errors.New("must include at least one query (http, firewall, gateway_l7)")
+	}
+
+	return result, nil
 }
