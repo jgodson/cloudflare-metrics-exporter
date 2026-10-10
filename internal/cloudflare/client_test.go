@@ -55,6 +55,28 @@ func TestFetchHTTPMetricsAggregatesByHost(t *testing.T) {
 										"visits": 7,
 										"edgeResponseBytes": 700
 									}
+								},
+								{
+									"dimensions": {
+										"clientRequestHTTPHost": "wp-admin.example.com",
+										"edgeResponseStatus": 404,
+										"cacheStatus": "dynamic"
+									},
+									"sum": {
+										"visits": 3,
+										"edgeResponseBytes": 30
+									}
+								},
+								{
+									"dimensions": {
+										"clientRequestHTTPHost": "example.com:8443",
+										"edgeResponseStatus": 403,
+										"cacheStatus": "dynamic"
+									},
+									"sum": {
+										"visits": 1,
+										"edgeResponseBytes": 10
+									}
 								}
 							]
 						}
@@ -72,7 +94,7 @@ func TestFetchHTTPMetricsAggregatesByHost(t *testing.T) {
 		Logger:     logger,
 	})
 
-	result, err := client.FetchHTTPMetrics(context.Background(), "zone-123", []string{"example.com", "docs.example.com"}, time.Now().Add(-time.Minute), time.Now())
+	result, err := client.FetchHTTPMetrics(context.Background(), "zone-123", []string{"example.com", "docs.example.com", "idle.example.com"}, time.Now().Add(-time.Minute), time.Now())
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -104,6 +126,18 @@ func TestFetchHTTPMetricsAggregatesByHost(t *testing.T) {
 	if docs.CachedRequests != 7 {
 		t.Fatalf("expected docs.example.com cached requests to be 7, got %.0f", docs.CachedRequests)
 	}
+
+	if idle, ok := result["idle.example.com"]; !ok || idle.Requests != 0 {
+		t.Fatalf("expected idle tracked host to be zero-filled, got %+v (present=%v)", idle, ok)
+	}
+
+	other := result[OtherHost]
+	if other.Requests != 4 {
+		t.Fatalf("expected untracked hosts to aggregate into other with 4 requests, got %.0f", other.Requests)
+	}
+	if other.StatusRequests["4xx"] != 4 {
+		t.Fatalf("expected other 4xx to be 4, got %.0f", other.StatusRequests["4xx"])
+	}
 }
 
 func TestFetchFirewallMetricsAggregatesByHostAction(t *testing.T) {
@@ -117,7 +151,8 @@ func TestFetchFirewallMetricsAggregatesByHostAction(t *testing.T) {
 							"firewallEventsAdaptiveGroups": [
 								{"dimensions": {"action": "block", "clientRequestHTTPHost": "example.com"}, "count": 2},
 								{"dimensions": {"action": "managed_challenge", "clientRequestHTTPHost": "example.com"}, "count": 1},
-								{"dimensions": {"action": "allow", "clientRequestHTTPHost": "docs.example.com"}, "count": 4}
+								{"dimensions": {"action": "allow", "clientRequestHTTPHost": "docs.example.com"}, "count": 4},
+								{"dimensions": {"action": "block", "clientRequestHTTPHost": "scanner.example.com"}, "count": 6}
 							]
 						}
 					]
@@ -143,6 +178,9 @@ func TestFetchFirewallMetricsAggregatesByHostAction(t *testing.T) {
 	}
 	if result["docs.example.com"]["allow"] != 4 {
 		t.Fatalf("expected allow count for docs.example.com to be 4, got %.0f", result["docs.example.com"]["allow"])
+	}
+	if result[OtherHost]["block"] != 6 {
+		t.Fatalf("expected untracked block events in other to be 6, got %.0f", result[OtherHost]["block"])
 	}
 }
 
@@ -198,5 +236,52 @@ func TestFetchHTTPMetricsHandlesGraphQLErrors(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "permission denied") {
 		t.Fatalf("expected graphql error to propagate, got %v", err)
+	}
+}
+
+func TestListZonesPaginates(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/zones" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("status"); got != "active" {
+			t.Fatalf("expected status=active filter, got %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Query().Get("page") {
+		case "1":
+			_, _ = w.Write([]byte(`{"success":true,"result":[{"id":"z1","name":"Example.com"}],"result_info":{"total_pages":2}}`))
+		case "2":
+			_, _ = w.Write([]byte(`{"success":true,"result":[{"id":"z2","name":"example.org"}],"result_info":{"total_pages":2}}`))
+		default:
+			t.Fatalf("unexpected page %q", r.URL.Query().Get("page"))
+		}
+	}))
+	defer srv.Close()
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	client := NewClient("secret-token", 5*time.Second, Options{RESTEndpoint: srv.URL, HTTPClient: srv.Client(), Logger: logger})
+
+	zones, err := client.ListZones(context.Background())
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(zones) != 2 || zones[0] != (Zone{ID: "z1", Name: "example.com"}) || zones[1] != (Zone{ID: "z2", Name: "example.org"}) {
+		t.Fatalf("unexpected zones: %+v", zones)
+	}
+}
+
+func TestListZonesReturnsAPIErrors(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"success":false,"errors":[{"message":"Unauthorized to access requested resource"}]}`))
+	}))
+	defer srv.Close()
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	client := NewClient("secret-token", 5*time.Second, Options{RESTEndpoint: srv.URL, HTTPClient: srv.Client(), Logger: logger})
+
+	if _, err := client.ListZones(context.Background()); err == nil || !strings.Contains(err.Error(), "403") {
+		t.Fatalf("expected 403 error, got %v", err)
 	}
 }

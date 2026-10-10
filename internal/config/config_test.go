@@ -31,12 +31,43 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 	if !cfg.EnabledQueries[QueryHTTP] || !cfg.EnabledQueries[QueryFirewall] || !cfg.EnabledQueries[QueryGateway] {
 		t.Fatalf("expected default enabled queries to include http, firewall, gateway_l7")
 	}
+	if cfg.ZoneRefresh != DefaultZoneRefresh {
+		t.Fatalf("expected default zone refresh %s, got %s", DefaultZoneRefresh, cfg.ZoneRefresh)
+	}
+}
+
+func TestLoadFromEnvOnlyTokenRequired(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("CF_ZONE_TAGS", "")
+	t.Setenv("CF_HOSTS", "")
+
+	cfg, err := LoadFromEnv()
+	if err != nil {
+		t.Fatalf("expected zone tags and hosts to be optional, got %v", err)
+	}
+	if len(cfg.ZoneTags) != 0 || len(cfg.Hosts) != 0 {
+		t.Fatalf("expected empty zone tags and hosts, got %v %v", cfg.ZoneTags, cfg.Hosts)
+	}
+
+	t.Setenv("CF_API_TOKEN", "")
+	if _, err := LoadFromEnv(); err == nil {
+		t.Fatal("expected error when CF_API_TOKEN is missing")
+	}
+}
+
+func TestLoadFromEnvZoneRefreshValidation(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("ZONE_REFRESH_INTERVAL", "30s")
+
+	if _, err := LoadFromEnv(); err == nil {
+		t.Fatal("expected error for too small zone refresh interval")
+	}
 }
 
 func TestLoadFromEnvHostParsing(t *testing.T) {
 	t.Setenv("CF_API_TOKEN", "token")
 	t.Setenv("CF_ZONE_TAGS", "zone-a")
-	t.Setenv("CF_HOSTS", " example.com, docs.example.com ,example.com,,templates.example.com ")
+	t.Setenv("CF_HOSTS", " example.com, Docs.Example.com ,example.com,,templates.example.com ")
 
 	cfg, err := LoadFromEnv()
 	if err != nil {
@@ -45,6 +76,9 @@ func TestLoadFromEnvHostParsing(t *testing.T) {
 
 	if len(cfg.Hosts) != 3 {
 		t.Fatalf("expected 3 unique hosts, got %d", len(cfg.Hosts))
+	}
+	if cfg.Hosts[1] != "docs.example.com" {
+		t.Fatalf("expected hosts to be lowercased, got %q", cfg.Hosts[1])
 	}
 }
 
@@ -163,4 +197,5 @@ func setRequiredEnv(t *testing.T) {
 	t.Setenv("REQUEST_TIMEOUT", "")
 	t.Setenv("LOG_LEVEL", "")
 	t.Setenv("ENABLED_QUERIES", "")
+	t.Setenv("ZONE_REFRESH_INTERVAL", "")
 }

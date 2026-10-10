@@ -16,6 +16,20 @@ type HostWindowMetrics struct {
 	StatusByClass     map[string]float64
 }
 
+// ZoneHTTPWindow holds one zone's HTTP results keyed by host label.
+type ZoneHTTPWindow struct {
+	Zone     string
+	ZoneName string
+	Hosts    map[string]HostWindowMetrics
+}
+
+// ZoneFirewallWindow holds one zone's firewall action counts keyed by host label.
+type ZoneFirewallWindow struct {
+	Zone     string
+	ZoneName string
+	Hosts    map[string]map[string]float64
+}
+
 type Registry struct {
 	registry *prometheus.Registry
 
@@ -39,23 +53,23 @@ func NewRegistry() *Registry {
 
 	r.HTTPRequestsWindow = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{Name: "cf_http_requests_window", Help: "HTTP requests in the current lookback window."},
-		[]string{"zone", "host"},
+		[]string{"zone", "zone_name", "host"},
 	)
 	r.HTTPEdgeResponseBytesWindow = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{Name: "cf_http_edge_response_bytes_window", Help: "Edge response bytes in the current lookback window."},
-		[]string{"zone", "host"},
+		[]string{"zone", "zone_name", "host"},
 	)
 	r.HTTPCachedRequestsWindow = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{Name: "cf_http_cached_requests_window", Help: "Cached requests in the current lookback window."},
-		[]string{"zone", "host"},
+		[]string{"zone", "zone_name", "host"},
 	)
 	r.HTTPStatusRequestsWindow = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{Name: "cf_http_status_requests_window", Help: "HTTP requests grouped by status class in the current window."},
-		[]string{"zone", "host", "status_class"},
+		[]string{"zone", "zone_name", "host", "status_class"},
 	)
 	r.FirewallEventsWindow = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{Name: "cf_firewall_events_window", Help: "Firewall events in the current lookback window grouped by host and action."},
-		[]string{"zone", "host", "action"},
+		[]string{"zone", "zone_name", "host", "action"},
 	)
 	r.GatewayL7RequestsWindow = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{Name: "cf_gateway_l7_requests_window", Help: "Gateway L7 requests in the current lookback window grouped by host and action."},
@@ -99,44 +113,35 @@ func (r *Registry) Gatherer() prometheus.Gatherer {
 	return r.registry
 }
 
-func (r *Registry) UpdateZoneWindows(hosts []string, dataByZone map[string]map[string]HostWindowMetrics) {
+func (r *Registry) UpdateZoneWindows(zones []ZoneHTTPWindow) {
 	r.HTTPRequestsWindow.Reset()
 	r.HTTPEdgeResponseBytesWindow.Reset()
 	r.HTTPCachedRequestsWindow.Reset()
 	r.HTTPStatusRequestsWindow.Reset()
 
-	for zone, data := range dataByZone {
-		for _, host := range hosts {
-			hostData, ok := data[host]
-			if !ok {
-				hostData = HostWindowMetrics{StatusByClass: map[string]float64{}}
-			}
-
-			r.HTTPRequestsWindow.WithLabelValues(zone, host).Set(hostData.Requests)
-			r.HTTPEdgeResponseBytesWindow.WithLabelValues(zone, host).Set(hostData.EdgeResponseBytes)
-			r.HTTPCachedRequestsWindow.WithLabelValues(zone, host).Set(hostData.CachedRequests)
+	for _, zone := range zones {
+		for host, hostData := range zone.Hosts {
+			r.HTTPRequestsWindow.WithLabelValues(zone.Zone, zone.ZoneName, host).Set(hostData.Requests)
+			r.HTTPEdgeResponseBytesWindow.WithLabelValues(zone.Zone, zone.ZoneName, host).Set(hostData.EdgeResponseBytes)
+			r.HTTPCachedRequestsWindow.WithLabelValues(zone.Zone, zone.ZoneName, host).Set(hostData.CachedRequests)
 			for _, class := range statusClasses {
-				r.HTTPStatusRequestsWindow.WithLabelValues(zone, host, class).Set(hostData.StatusByClass[class])
+				r.HTTPStatusRequestsWindow.WithLabelValues(zone.Zone, zone.ZoneName, host, class).Set(hostData.StatusByClass[class])
 			}
 		}
 	}
 }
 
-func (r *Registry) UpdateFirewallWindows(hosts []string, dataByZone map[string]map[string]map[string]float64) {
+func (r *Registry) UpdateFirewallWindows(zones []ZoneFirewallWindow) {
 	r.FirewallEventsWindow.Reset()
 
-	for zone, data := range dataByZone {
-		for _, host := range hosts {
-			actions, ok := data[host]
-			if !ok {
-				continue
-			}
+	for _, zone := range zones {
+		for host, actions := range zone.Hosts {
 			for action, value := range actions {
 				a := strings.TrimSpace(action)
 				if a == "" {
 					continue
 				}
-				r.FirewallEventsWindow.WithLabelValues(zone, host, a).Set(value)
+				r.FirewallEventsWindow.WithLabelValues(zone.Zone, zone.ZoneName, host, a).Set(value)
 			}
 		}
 	}
@@ -189,6 +194,12 @@ func (r *Registry) SetQueryUp(query, target string, up bool) {
 		return
 	}
 	r.QueryUp.WithLabelValues(query, target).Set(0)
+}
+
+// DeleteQuerySeries removes query health series for a target that is no longer polled.
+func (r *Registry) DeleteQuerySeries(target string) {
+	r.QueryUp.DeletePartialMatch(prometheus.Labels{"target": target})
+	r.QueryErrorsTotal.DeletePartialMatch(prometheus.Labels{"target": target})
 }
 
 func (r *Registry) IncQueryErrors(query, target string) {

@@ -10,12 +10,9 @@ func TestBuildQueryVariables(t *testing.T) {
 	from := time.Date(2026, 2, 20, 10, 0, 0, 0, time.UTC)
 	to := from.Add(time.Minute)
 
-	vars := BuildQueryVariables("zone_123", []string{"example.com"}, from, to)
+	vars := BuildQueryVariables("zone_123", from, to)
 	if vars.ZoneTag != "zone_123" {
 		t.Fatalf("expected zone tag to be set")
-	}
-	if len(vars.Hosts) != 1 || vars.Hosts[0] != "example.com" {
-		t.Fatalf("expected hosts to be preserved")
 	}
 	if vars.From != "2026-02-20T10:00:00Z" {
 		t.Fatalf("unexpected from value: %s", vars.From)
@@ -57,6 +54,14 @@ func TestHTTPMetricsQueryContainsExpectedFields(t *testing.T) {
 	}
 }
 
+func TestZoneQueriesDoNotFilterByHost(t *testing.T) {
+	for name, query := range map[string]string{"http": HTTPMetricsQuery, "firewall": FirewallMetricsQuery} {
+		if strings.Contains(query, "clientRequestHTTPHost_in") {
+			t.Fatalf("expected %s query to cover the whole zone", name)
+		}
+	}
+}
+
 func TestFirewallMetricsQueryContainsExpectedFields(t *testing.T) {
 	required := []string{
 		"firewallEventsAdaptiveGroups",
@@ -89,7 +94,7 @@ func TestBuildGraphQLRequest(t *testing.T) {
 	from := time.Date(2026, 2, 20, 10, 0, 0, 0, time.UTC)
 	to := from.Add(2 * time.Minute)
 
-	req := BuildGraphQLRequest("zone_abc", []string{"a.com", "b.com"}, from, to)
+	req := BuildGraphQLRequest("zone_abc", from, to)
 	if req.Query == "" {
 		t.Fatal("expected query to be present")
 	}

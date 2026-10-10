@@ -19,6 +19,8 @@ const (
 	DefaultHTTPAddr       = ":8080"
 	DefaultRequestTimeout = 10 * time.Second
 	DefaultLogLevel       = "info"
+	DefaultZoneRefresh    = 10 * time.Minute
+	MinZoneRefresh        = 1 * time.Minute
 
 	QueryHTTP     = "http"
 	QueryFirewall = "firewall"
@@ -36,6 +38,7 @@ type Config struct {
 	RequestTimeout time.Duration
 	LogLevel       string
 	EnabledQueries map[string]bool
+	ZoneRefresh    time.Duration
 }
 
 func LoadFromEnv() (Config, error) {
@@ -46,6 +49,7 @@ func LoadFromEnv() (Config, error) {
 		RequestTimeout: DefaultRequestTimeout,
 		LogLevel:       DefaultLogLevel,
 		EnabledQueries: defaultEnabledQueries(),
+		ZoneRefresh:    DefaultZoneRefresh,
 	}
 
 	var errs []string
@@ -56,15 +60,8 @@ func LoadFromEnv() (Config, error) {
 	if cfg.APIToken == "" {
 		errs = append(errs, "CF_API_TOKEN is required")
 	}
-	if len(cfg.ZoneTags) == 0 {
-		errs = append(errs, "CF_ZONE_TAGS is required and must contain at least one zone tag")
-	}
 
-	hostsRaw := strings.TrimSpace(os.Getenv("CF_HOSTS"))
-	cfg.Hosts = parseHosts(hostsRaw)
-	if len(cfg.Hosts) == 0 {
-		errs = append(errs, "CF_HOSTS is required and must contain at least one host")
-	}
+	cfg.Hosts = parseHosts(strings.TrimSpace(os.Getenv("CF_HOSTS")))
 
 	if value := strings.TrimSpace(os.Getenv("POLL_INTERVAL")); value != "" {
 		d, err := time.ParseDuration(value)
@@ -106,6 +103,15 @@ func LoadFromEnv() (Config, error) {
 		cfg.LogLevel = strings.ToLower(value)
 	}
 
+	if value := strings.TrimSpace(os.Getenv("ZONE_REFRESH_INTERVAL")); value != "" {
+		d, err := time.ParseDuration(value)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("ZONE_REFRESH_INTERVAL is invalid: %v", err))
+		} else {
+			cfg.ZoneRefresh = d
+		}
+	}
+
 	if value := strings.TrimSpace(os.Getenv("ENABLED_QUERIES")); value != "" {
 		queries, err := parseEnabledQueries(value)
 		if err != nil {
@@ -124,6 +130,9 @@ func LoadFromEnv() (Config, error) {
 	if cfg.Window > MaxWindow {
 		errs = append(errs, fmt.Sprintf("WINDOW must be <= %s", MaxWindow))
 	}
+	if cfg.ZoneRefresh < MinZoneRefresh {
+		errs = append(errs, fmt.Sprintf("ZONE_REFRESH_INTERVAL must be >= %s", MinZoneRefresh))
+	}
 	if cfg.RequestTimeout <= 0 {
 		errs = append(errs, "REQUEST_TIMEOUT must be > 0")
 	}
@@ -141,8 +150,9 @@ func LoadFromEnv() (Config, error) {
 	return cfg, nil
 }
 
+// parseHosts lowercases hosts so they match Cloudflare's reported host values.
 func parseHosts(raw string) []string {
-	return parseCSVUnique(raw)
+	return parseCSVUnique(strings.ToLower(raw))
 }
 
 func parseCSVUnique(raw string) []string {

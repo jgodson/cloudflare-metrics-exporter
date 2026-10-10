@@ -24,6 +24,8 @@ func TestPollerAndMetricsEndpointIntegration(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 
 		switch {
+		case r.URL.Path == "/zones":
+			_, _ = w.Write([]byte(`{"success":true,"result":[{"id":"zone_123","name":"example.com"}],"result_info":{"total_pages":1}}`))
 		case strings.Contains(queryBody, "httpRequestsAdaptiveGroups"):
 			_, _ = w.Write([]byte(`{
 				"data": {
@@ -42,6 +44,10 @@ func TestPollerAndMetricsEndpointIntegration(t *testing.T) {
 									{
 										"dimensions": {"clientRequestHTTPHost": "templates.example.com", "edgeResponseStatus": 301, "cacheStatus": "stale"},
 										"sum": {"visits": 4, "edgeResponseBytes": 400}
+									},
+									{
+										"dimensions": {"clientRequestHTTPHost": "wordpress.example.com", "edgeResponseStatus": 404, "cacheStatus": "dynamic"},
+										"sum": {"visits": 6, "edgeResponseBytes": 60}
 									}
 								]
 							}
@@ -102,8 +108,9 @@ func TestPollerAndMetricsEndpointIntegration(t *testing.T) {
 		APIToken:       "token",
 		ZoneTags:       []string{"zone_123"},
 		AccountTag:     "account_123",
-		Hosts:          []string{"example.com", "docs.example.com", "templates.example.com"},
+		Hosts:          []string{"docs.example.com", "templates.example.com"},
 		PollInterval:   time.Minute,
+		ZoneRefresh:    10 * time.Minute,
 		Window:         time.Minute,
 		HTTPAddr:       ":8080",
 		RequestTimeout: 5 * time.Second,
@@ -113,9 +120,10 @@ func TestPollerAndMetricsEndpointIntegration(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	registry := metrics.NewRegistry()
 	client := cloudflare.NewClient(cfg.APIToken, cfg.RequestTimeout, cloudflare.Options{
-		Endpoint:   mockCF.URL,
-		HTTPClient: mockCF.Client(),
-		Logger:     logger,
+		Endpoint:     mockCF.URL + "/graphql",
+		RESTEndpoint: mockCF.URL,
+		HTTPClient:   mockCF.Client(),
+		Logger:       logger,
 	})
 
 	p := poller.New(cfg, client, registry, logger)
@@ -138,9 +146,15 @@ func TestPollerAndMetricsEndpointIntegration(t *testing.T) {
 			t.Fatalf("expected %s in metrics body", metricName)
 		}
 	}
-	for _, host := range cfg.Hosts {
-		if !strings.Contains(body, host) {
-			t.Fatalf("expected host %s in metrics output", host)
+	for _, want := range []string{
+		`cf_http_requests_window{host="example.com",zone="zone_123",zone_name="example.com"} 15`,
+		`cf_http_requests_window{host="docs.example.com",zone="zone_123",zone_name="example.com"} 2`,
+		`cf_http_requests_window{host="templates.example.com",zone="zone_123",zone_name="example.com"} 4`,
+		`cf_http_requests_window{host="other",zone="zone_123",zone_name="example.com"} 6`,
+		`cf_exporter_query_up{query="zones",target="discovery"} 1`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in metrics output:\n%s", want, body)
 		}
 	}
 }

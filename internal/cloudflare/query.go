@@ -3,7 +3,7 @@ package cloudflare
 import "time"
 
 const HTTPMetricsQuery = `
-query ZoneHTTPMetrics($zoneTag: string!, $hosts: [string!], $from: Time!, $to: Time!) {
+query ZoneHTTPMetrics($zoneTag: string!, $from: Time!, $to: Time!) {
   viewer {
     zones(filter: { zoneTag: $zoneTag }) {
       httpRequestsAdaptiveGroups(
@@ -11,7 +11,6 @@ query ZoneHTTPMetrics($zoneTag: string!, $hosts: [string!], $from: Time!, $to: T
         filter: {
           datetime_geq: $from
           datetime_lt: $to
-          clientRequestHTTPHost_in: $hosts
         }
       ) {
         dimensions {
@@ -30,7 +29,7 @@ query ZoneHTTPMetrics($zoneTag: string!, $hosts: [string!], $from: Time!, $to: T
 `
 
 const FirewallMetricsQuery = `
-query ZoneFirewallMetrics($zoneTag: string!, $hosts: [string!], $from: Time!, $to: Time!) {
+query ZoneFirewallMetrics($zoneTag: string!, $from: Time!, $to: Time!) {
   viewer {
     zones(filter: { zoneTag: $zoneTag }) {
       firewallEventsAdaptiveGroups(
@@ -38,7 +37,6 @@ query ZoneFirewallMetrics($zoneTag: string!, $hosts: [string!], $from: Time!, $t
         filter: {
           datetime_geq: $from
           datetime_lt: $to
-          clientRequestHTTPHost_in: $hosts
         }
       ) {
         dimensions {
@@ -86,10 +84,9 @@ type AccountGraphQLRequest struct {
 }
 
 type QueryVariables struct {
-	ZoneTag string   `json:"zoneTag"`
-	Hosts   []string `json:"hosts"`
-	From    string   `json:"from"`
-	To      string   `json:"to"`
+	ZoneTag string `json:"zoneTag"`
+	From    string `json:"from"`
+	To      string `json:"to"`
 }
 
 type AccountQueryVariables struct {
@@ -99,10 +96,9 @@ type AccountQueryVariables struct {
 	To         string   `json:"to"`
 }
 
-func BuildQueryVariables(zoneTag string, hosts []string, from, to time.Time) QueryVariables {
+func BuildQueryVariables(zoneTag string, from, to time.Time) QueryVariables {
 	return QueryVariables{
 		ZoneTag: zoneTag,
-		Hosts:   hosts,
 		From:    from.UTC().Format(time.RFC3339),
 		To:      to.UTC().Format(time.RFC3339),
 	}
@@ -117,17 +113,17 @@ func BuildAccountQueryVariables(accountTag string, hosts []string, from, to time
 	}
 }
 
-func BuildGraphQLRequest(zoneTag string, hosts []string, from, to time.Time) GraphQLRequest {
+func BuildGraphQLRequest(zoneTag string, from, to time.Time) GraphQLRequest {
 	return GraphQLRequest{
 		Query:     HTTPMetricsQuery,
-		Variables: BuildQueryVariables(zoneTag, hosts, from, to),
+		Variables: BuildQueryVariables(zoneTag, from, to),
 	}
 }
 
-func BuildFirewallGraphQLRequest(zoneTag string, hosts []string, from, to time.Time) GraphQLRequest {
+func BuildFirewallGraphQLRequest(zoneTag string, from, to time.Time) GraphQLRequest {
 	return GraphQLRequest{
 		Query:     FirewallMetricsQuery,
-		Variables: BuildQueryVariables(zoneTag, hosts, from, to),
+		Variables: BuildQueryVariables(zoneTag, from, to),
 	}
 }
 

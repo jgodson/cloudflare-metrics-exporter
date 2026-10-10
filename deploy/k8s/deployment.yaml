@@ -34,12 +34,10 @@ spec:
                 secretKeyRef:
                   name: cloudflare-metrics-exporter
                   key: CF_API_TOKEN
-            - name: CF_ZONE_TAGS
-              value: "<zone-tag-1,zone-tag-2>"
             - name: CF_ACCOUNT_TAG
               value: "<account-tag-or-empty>"
             - name: CF_HOSTS
-              value: "example.com,docs.example.com,templates.example.com"
+              value: "docs.example.com,templates.example.com"
             - name: ENABLED_QUERIES
               value: "http,firewall,gateway_l7"
             - name: POLL_INTERVAL
