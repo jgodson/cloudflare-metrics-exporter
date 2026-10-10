@@ -31,6 +31,9 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 	if !cfg.EnabledQueries[QueryHTTP] || !cfg.EnabledQueries[QueryFirewall] || !cfg.EnabledQueries[QueryGateway] {
 		t.Fatalf("expected default enabled queries to include http, firewall, gateway_l7")
 	}
+	if cfg.QueryDelay != DefaultQueryDelay {
+		t.Fatalf("expected default query delay %s, got %s", DefaultQueryDelay, cfg.QueryDelay)
+	}
 	if cfg.ZoneRefresh != DefaultZoneRefresh {
 		t.Fatalf("expected default zone refresh %s, got %s", DefaultZoneRefresh, cfg.ZoneRefresh)
 	}
@@ -52,6 +55,19 @@ func TestLoadFromEnvOnlyTokenRequired(t *testing.T) {
 	t.Setenv("CF_API_TOKEN", "")
 	if _, err := LoadFromEnv(); err == nil {
 		t.Fatal("expected error when CF_API_TOKEN is missing")
+	}
+}
+
+func TestLoadFromEnvQueryDelayValidation(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("QUERY_DELAY", "0s")
+	if _, err := LoadFromEnv(); err != nil {
+		t.Fatalf("expected zero query delay to be allowed, got %v", err)
+	}
+
+	t.Setenv("QUERY_DELAY", "11m")
+	if _, err := LoadFromEnv(); err == nil {
+		t.Fatal("expected error for too large query delay")
 	}
 }
 
@@ -198,4 +214,5 @@ func setRequiredEnv(t *testing.T) {
 	t.Setenv("LOG_LEVEL", "")
 	t.Setenv("ENABLED_QUERIES", "")
 	t.Setenv("ZONE_REFRESH_INTERVAL", "")
+	t.Setenv("QUERY_DELAY", "")
 }

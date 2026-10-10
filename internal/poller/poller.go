@@ -105,7 +105,9 @@ func (p *Poller) PollOnce(ctx context.Context) error {
 
 	start := time.Now()
 	pollTime := p.now().UTC()
-	from := pollTime.Add(-p.cfg.Window)
+	// Cloudflare analytics lag behind real time, so query a window that ends QueryDelay ago.
+	to := pollTime.Add(-p.cfg.QueryDelay)
+	from := to.Add(-p.cfg.Window)
 
 	allQueriesSucceeded := true
 	httpEnabled := p.queryEnabled(queryHTTP)
@@ -124,7 +126,7 @@ func (p *Poller) PollOnce(ctx context.Context) error {
 
 	for _, zone := range p.zones {
 		if httpEnabled {
-			httpResult, err := p.fetchHTTPWithRetry(ctx, zone, from, pollTime)
+			httpResult, err := p.fetchHTTPWithRetry(ctx, zone, from, to)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					return context.Canceled
@@ -139,6 +141,7 @@ func (p *Poller) PollOnce(ctx context.Context) error {
 				for host, values := range httpResult {
 					converted[host] = metrics.HostWindowMetrics{
 						Requests:          values.Requests,
+						Visits:            values.Visits,
 						EdgeResponseBytes: values.EdgeResponseBytes,
 						CachedRequests:    values.CachedRequests,
 						StatusByClass:     values.StatusRequests,
@@ -149,7 +152,7 @@ func (p *Poller) PollOnce(ctx context.Context) error {
 		}
 
 		if firewallEnabled {
-			firewallResult, err := p.fetchFirewallWithRetry(ctx, zone, from, pollTime)
+			firewallResult, err := p.fetchFirewallWithRetry(ctx, zone, from, to)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					return context.Canceled
@@ -169,7 +172,7 @@ func (p *Poller) PollOnce(ctx context.Context) error {
 	p.metrics.UpdateFirewallWindows(firewallWindows)
 
 	if gatewayEnabled && strings.TrimSpace(p.cfg.AccountTag) != "" {
-		gatewayResult, err := p.fetchGatewayWithRetry(ctx, from, pollTime)
+		gatewayResult, err := p.fetchGatewayWithRetry(ctx, from, to)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				return context.Canceled

@@ -19,6 +19,8 @@ const (
 	DefaultHTTPAddr       = ":8080"
 	DefaultRequestTimeout = 10 * time.Second
 	DefaultLogLevel       = "info"
+	DefaultQueryDelay     = 2 * time.Minute
+	MaxQueryDelay         = 10 * time.Minute
 	DefaultZoneRefresh    = 10 * time.Minute
 	MinZoneRefresh        = 1 * time.Minute
 
@@ -39,6 +41,7 @@ type Config struct {
 	LogLevel       string
 	EnabledQueries map[string]bool
 	ZoneRefresh    time.Duration
+	QueryDelay     time.Duration
 }
 
 func LoadFromEnv() (Config, error) {
@@ -50,6 +53,7 @@ func LoadFromEnv() (Config, error) {
 		LogLevel:       DefaultLogLevel,
 		EnabledQueries: defaultEnabledQueries(),
 		ZoneRefresh:    DefaultZoneRefresh,
+		QueryDelay:     DefaultQueryDelay,
 	}
 
 	var errs []string
@@ -112,6 +116,15 @@ func LoadFromEnv() (Config, error) {
 		}
 	}
 
+	if value := strings.TrimSpace(os.Getenv("QUERY_DELAY")); value != "" {
+		d, err := time.ParseDuration(value)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("QUERY_DELAY is invalid: %v", err))
+		} else {
+			cfg.QueryDelay = d
+		}
+	}
+
 	if value := strings.TrimSpace(os.Getenv("ENABLED_QUERIES")); value != "" {
 		queries, err := parseEnabledQueries(value)
 		if err != nil {
@@ -129,6 +142,9 @@ func LoadFromEnv() (Config, error) {
 	}
 	if cfg.Window > MaxWindow {
 		errs = append(errs, fmt.Sprintf("WINDOW must be <= %s", MaxWindow))
+	}
+	if cfg.QueryDelay < 0 || cfg.QueryDelay > MaxQueryDelay {
+		errs = append(errs, fmt.Sprintf("QUERY_DELAY must be between 0 and %s", MaxQueryDelay))
 	}
 	if cfg.ZoneRefresh < MinZoneRefresh {
 		errs = append(errs, fmt.Sprintf("ZONE_REFRESH_INTERVAL must be >= %s", MinZoneRefresh))

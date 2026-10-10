@@ -198,13 +198,14 @@ func aggregateHTTPMetrics(trackedHosts []string, response httpGraphQLResponse) m
 		host := bucketHost(group.Dimensions.ClientRequestHTTPHost, results)
 		hostMetrics := results[host]
 
-		hostMetrics.Requests += group.Sum.Requests
+		hostMetrics.Requests += group.Count
+		hostMetrics.Visits += group.Sum.Visits
 		hostMetrics.EdgeResponseBytes += group.Sum.EdgeResponseBytes
 		if isCachedResponse(group.Dimensions.CacheStatus) {
-			hostMetrics.CachedRequests += group.Sum.Requests
+			hostMetrics.CachedRequests += group.Count
 		}
 		if status := statusClass(group.Dimensions.EdgeResponseStatus); status != "" {
-			hostMetrics.StatusRequests[status] += group.Sum.Requests
+			hostMetrics.StatusRequests[status] += group.Count
 		}
 		results[host] = hostMetrics
 	}
@@ -325,8 +326,9 @@ type httpGraphQLResponse struct {
 						EdgeResponseStatus    int    `json:"edgeResponseStatus"`
 						CacheStatus           string `json:"cacheStatus"`
 					} `json:"dimensions"`
-					Sum struct {
-						Requests          float64 `json:"visits"`
+					Count float64 `json:"count"`
+					Sum   struct {
+						Visits            float64 `json:"visits"`
 						EdgeResponseBytes float64 `json:"edgeResponseBytes"`
 					} `json:"sum"`
 				} `json:"httpRequestsAdaptiveGroups"`

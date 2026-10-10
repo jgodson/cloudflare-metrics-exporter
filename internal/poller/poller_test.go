@@ -20,6 +20,7 @@ type fakeClient struct {
 	zonesErr             error
 	zonesCalls           int
 	httpHostsByZone      map[string][]string
+	httpFrom, httpTo     time.Time
 	httpResultByZone     map[string]map[string]cloudflare.HostMetrics
 	httpErrByZone        map[string]error
 	firewallResultByZone map[string]map[string]map[string]float64
@@ -45,6 +46,7 @@ func (f *fakeClient) FetchHTTPMetrics(ctx context.Context, zoneTag string, hosts
 		f.httpHostsByZone = map[string][]string{}
 	}
 	f.httpHostsByZone[zoneTag] = hosts
+	f.httpFrom, f.httpTo = from, to
 	if err, ok := f.httpErrByZone[zoneTag]; ok && err != nil {
 		return nil, err
 	}
@@ -178,6 +180,20 @@ func TestPollOnceSuccessUpdatesMetrics(t *testing.T) {
 	}
 	if testutil.ToFloat64(registry.QueryUp.WithLabelValues("gateway_l7", cfg.AccountTag)) != 1 {
 		t.Fatalf("expected gateway query up for account")
+	}
+}
+
+func TestPollOnceQueriesDelayedWindow(t *testing.T) {
+	client := &fakeClient{zones: testZones[:1]}
+	poller, _ := newTestPoller(config.Config{QueryDelay: 2 * time.Minute, EnabledQueries: map[string]bool{queryHTTP: true}}, client)
+
+	if err := poller.PollOnce(context.Background()); err != nil {
+		t.Fatalf("expected poll success, got %v", err)
+	}
+
+	now := time.Unix(1700000000, 0).UTC()
+	if !client.httpTo.Equal(now.Add(-2*time.Minute)) || !client.httpFrom.Equal(now.Add(-3*time.Minute)) {
+		t.Fatalf("expected window [now-3m, now-2m), got [%s, %s)", client.httpFrom, client.httpTo)
 	}
 }
 

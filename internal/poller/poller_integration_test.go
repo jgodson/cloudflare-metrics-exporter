@@ -35,19 +35,19 @@ func TestPollerAndMetricsEndpointIntegration(t *testing.T) {
 								"httpRequestsAdaptiveGroups": [
 									{
 										"dimensions": {"clientRequestHTTPHost": "example.com", "edgeResponseStatus": 200, "cacheStatus": "hit"},
-										"sum": {"visits": 15, "edgeResponseBytes": 1500}
+										"count": 15, "sum": {"visits": 1, "edgeResponseBytes": 1500}
 									},
 									{
 										"dimensions": {"clientRequestHTTPHost": "docs.example.com", "edgeResponseStatus": 404, "cacheStatus": "dynamic"},
-										"sum": {"visits": 2, "edgeResponseBytes": 200}
+										"count": 2, "sum": {"visits": 1, "edgeResponseBytes": 200}
 									},
 									{
 										"dimensions": {"clientRequestHTTPHost": "templates.example.com", "edgeResponseStatus": 301, "cacheStatus": "stale"},
-										"sum": {"visits": 4, "edgeResponseBytes": 400}
+										"count": 4, "sum": {"visits": 1, "edgeResponseBytes": 400}
 									},
 									{
 										"dimensions": {"clientRequestHTTPHost": "wordpress.example.com", "edgeResponseStatus": 404, "cacheStatus": "dynamic"},
-										"sum": {"visits": 6, "edgeResponseBytes": 60}
+										"count": 6, "sum": {"visits": 1, "edgeResponseBytes": 60}
 									}
 								]
 							}
@@ -151,6 +151,7 @@ func TestPollerAndMetricsEndpointIntegration(t *testing.T) {
 		`cf_http_requests_window{host="docs.example.com",zone="zone_123",zone_name="example.com"} 2`,
 		`cf_http_requests_window{host="templates.example.com",zone="zone_123",zone_name="example.com"} 4`,
 		`cf_http_requests_window{host="other",zone="zone_123",zone_name="example.com"} 6`,
+		`cf_http_visits_window{host="example.com",zone="zone_123",zone_name="example.com"} 1`,
 		`cf_exporter_query_up{query="zones",target="discovery"} 1`,
 	} {
 		if !strings.Contains(body, want) {

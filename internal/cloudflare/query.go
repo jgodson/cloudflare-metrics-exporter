@@ -18,6 +18,7 @@ query ZoneHTTPMetrics($zoneTag: string!, $from: Time!, $to: Time!) {
           edgeResponseStatus
           cacheStatus
         }
+        count
         sum {
           visits
           edgeResponseBytes

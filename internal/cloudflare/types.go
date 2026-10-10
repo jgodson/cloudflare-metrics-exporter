@@ -10,6 +10,7 @@ type Zone struct {
 
 type HostMetrics struct {
 	Requests          float64
+	Visits            float64
 	EdgeResponseBytes float64
 	CachedRequests    float64
 	StatusRequests    map[string]float64

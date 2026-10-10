@@ -11,6 +11,7 @@ var statusClasses = []string{"2xx", "3xx", "4xx", "5xx"}
 
 type HostWindowMetrics struct {
 	Requests          float64
+	Visits            float64
 	EdgeResponseBytes float64
 	CachedRequests    float64
 	StatusByClass     map[string]float64
@@ -34,6 +35,7 @@ type Registry struct {
 	registry *prometheus.Registry
 
 	HTTPRequestsWindow          *prometheus.GaugeVec
+	HTTPVisitsWindow            *prometheus.GaugeVec
 	HTTPEdgeResponseBytesWindow *prometheus.GaugeVec
 	HTTPCachedRequestsWindow    *prometheus.GaugeVec
 	HTTPStatusRequestsWindow    *prometheus.GaugeVec
@@ -53,6 +55,10 @@ func NewRegistry() *Registry {
 
 	r.HTTPRequestsWindow = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{Name: "cf_http_requests_window", Help: "HTTP requests in the current lookback window."},
+		[]string{"zone", "zone_name", "host"},
+	)
+	r.HTTPVisitsWindow = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{Name: "cf_http_visits_window", Help: "Visits (page views from another site or direct) in the current lookback window."},
 		[]string{"zone", "zone_name", "host"},
 	)
 	r.HTTPEdgeResponseBytesWindow = prometheus.NewGaugeVec(
@@ -91,6 +97,7 @@ func NewRegistry() *Registry {
 
 	r.registry.MustRegister(
 		r.HTTPRequestsWindow,
+		r.HTTPVisitsWindow,
 		r.HTTPEdgeResponseBytesWindow,
 		r.HTTPCachedRequestsWindow,
 		r.HTTPStatusRequestsWindow,
@@ -115,6 +122,7 @@ func (r *Registry) Gatherer() prometheus.Gatherer {
 
 func (r *Registry) UpdateZoneWindows(zones []ZoneHTTPWindow) {
 	r.HTTPRequestsWindow.Reset()
+	r.HTTPVisitsWindow.Reset()
 	r.HTTPEdgeResponseBytesWindow.Reset()
 	r.HTTPCachedRequestsWindow.Reset()
 	r.HTTPStatusRequestsWindow.Reset()
@@ -122,6 +130,7 @@ func (r *Registry) UpdateZoneWindows(zones []ZoneHTTPWindow) {
 	for _, zone := range zones {
 		for host, hostData := range zone.Hosts {
 			r.HTTPRequestsWindow.WithLabelValues(zone.Zone, zone.ZoneName, host).Set(hostData.Requests)
+			r.HTTPVisitsWindow.WithLabelValues(zone.Zone, zone.ZoneName, host).Set(hostData.Visits)
 			r.HTTPEdgeResponseBytesWindow.WithLabelValues(zone.Zone, zone.ZoneName, host).Set(hostData.EdgeResponseBytes)
 			r.HTTPCachedRequestsWindow.WithLabelValues(zone.Zone, zone.ZoneName, host).Set(hostData.CachedRequests)
 			for _, class := range statusClasses {

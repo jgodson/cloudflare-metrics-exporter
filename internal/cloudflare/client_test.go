@@ -29,8 +29,9 @@ func TestFetchHTTPMetricsAggregatesByHost(t *testing.T) {
 										"edgeResponseStatus": 200,
 										"cacheStatus": "hit"
 									},
+									"count": 10,
 									"sum": {
-										"visits": 10,
+										"visits": 1,
 										"edgeResponseBytes": 1000
 									}
 								},
@@ -40,8 +41,9 @@ func TestFetchHTTPMetricsAggregatesByHost(t *testing.T) {
 										"edgeResponseStatus": 404,
 										"cacheStatus": "dynamic"
 									},
+									"count": 2,
 									"sum": {
-										"visits": 2,
+										"visits": 1,
 										"edgeResponseBytes": 200
 									}
 								},
@@ -51,8 +53,9 @@ func TestFetchHTTPMetricsAggregatesByHost(t *testing.T) {
 										"edgeResponseStatus": 301,
 										"cacheStatus": "revalidated"
 									},
+									"count": 7,
 									"sum": {
-										"visits": 7,
+										"visits": 1,
 										"edgeResponseBytes": 700
 									}
 								},
@@ -62,8 +65,9 @@ func TestFetchHTTPMetricsAggregatesByHost(t *testing.T) {
 										"edgeResponseStatus": 404,
 										"cacheStatus": "dynamic"
 									},
+									"count": 3,
 									"sum": {
-										"visits": 3,
+										"visits": 1,
 										"edgeResponseBytes": 30
 									}
 								},
@@ -73,6 +77,7 @@ func TestFetchHTTPMetricsAggregatesByHost(t *testing.T) {
 										"edgeResponseStatus": 403,
 										"cacheStatus": "dynamic"
 									},
+									"count": 1,
 									"sum": {
 										"visits": 1,
 										"edgeResponseBytes": 10
@@ -114,6 +119,10 @@ func TestFetchHTTPMetricsAggregatesByHost(t *testing.T) {
 	}
 	if spendseer.CachedRequests != 10 {
 		t.Fatalf("expected example.com cached requests to be 10, got %.0f", spendseer.CachedRequests)
+	}
+
+	if spendseer.Visits != 2 {
+		t.Fatalf("expected example.com visits to be 2, got %.0f", spendseer.Visits)
 	}
 
 	docs := result["docs.example.com"]

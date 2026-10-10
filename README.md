@@ -13,7 +13,8 @@ Prometheus exporter that polls Cloudflare GraphQL analytics every minute and pub
 
 ## Metrics
 
-- `cf_http_requests_window{zone,zone_name,host}`
+- `cf_http_requests_window{zone,zone_name,host}` (all requests)
+- `cf_http_visits_window{zone,zone_name,host}` (visits: page views whose referer is another site or empty)
 - `cf_http_edge_response_bytes_window{zone,zone_name,host}`
 - `cf_http_cached_requests_window{zone,zone_name,host}`
 - `cf_http_status_requests_window{zone,zone_name,host,status_class}`
@@ -38,6 +39,7 @@ Prometheus exporter that polls Cloudflare GraphQL analytics every minute and pub
 | `ENABLED_QUERIES` | No | `http,firewall,gateway_l7` | Comma-separated query list. Allowed: `http`, `firewall`, `gateway_l7` (or alias `gateway`). Disable unsupported datasets (for example free-plan zones can use `http,gateway_l7`). |
 | `POLL_INTERVAL` | No | `60s` | Must be `>= 30s`. |
 | `WINDOW` | No | `1m` | Must be `>= POLL_INTERVAL` and `<= 15m`. |
+| `QUERY_DELAY` | No | `2m` | How far behind real time the query window ends, since Cloudflare analytics take a minute or two to fill in. Each poll queries `[now - QUERY_DELAY - WINDOW, now - QUERY_DELAY)`. Must be between `0` and `10m`. |
 | `PORT` | No | `8080` | HTTP listen port (binds `:PORT`). |
 | `REQUEST_TIMEOUT` | No | `10s` | Per-request timeout to Cloudflare GraphQL. |
 | `LOG_LEVEL` | No | `info` | `debug`, `info`, `warn`, or `error`. |
