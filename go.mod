@@ -1,6 +1,6 @@
 module github.com/jasongodson/cloudflare-metrics-exporter
 
-go 1.22
+go 1.27
 
 require github.com/prometheus/client_golang v1.20.5
 
